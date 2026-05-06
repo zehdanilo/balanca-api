@@ -644,8 +644,12 @@
     return ticket?.status === "COMPLETO";
   }
 
+  function hasWeighings(ticket) {
+    return Number(ticket?.pesagens_count ?? ticket?.pesagens?.length ?? 0) > 0;
+  }
+
   function isInProgress(ticket) {
-    return ticket?.status === "EM_ANDAMENTO";
+    return ticket?.status === "EM_ANDAMENTO" || (!isLocked(ticket) && hasWeighings(ticket));
   }
 
   function canCloseTicket(ticket) {
@@ -696,7 +700,7 @@
   }
 
   function setFormLocked(locked, protectedLocked = false) {
-    const protectedIds = ["placaCavalo", "placaTanque", "motorista", "fornecedorCliente", "transportadora"];
+    const protectedIds = ["placaCavalo", "placaTanque"];
     els.ticketForm.classList.toggle("locked", locked);
     els.ticketForm.classList.toggle("protected-locked", protectedLocked && !locked);
     els.ticketForm.querySelectorAll("input, select").forEach((control) => {
@@ -728,7 +732,10 @@
   }
 
   function actionButtonForTicket(ticket) {
-    const disabled = isLocked(ticket) && !hasAdminConfirmation() ? "disabled" : "";
+    const editDisabled = isLocked(ticket) && !hasAdminConfirmation() ? "disabled" : "";
+    const deleteDisabled = (isLocked(ticket) || hasWeighings(ticket)) && !hasAdminConfirmation() ? "disabled" : "";
+    const disabled = editDisabled;
+    const effectiveDeleteTitle = deleteDisabled ? "Modo admin necessario" : "Excluir";
     const editTitle = disabled ? "Modo admin necessário" : "Editar";
     const deleteTitle = disabled ? "Modo admin necessário" : "Excluir";
 
@@ -736,10 +743,10 @@
       <button class="action-btn icon-only" data-action="view" data-id="${ticket.id}" type="button" title="Visualizar" aria-label="Visualizar ticket">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.25 12s3.5-6 9.75-6 9.75 6 9.75 6-3.5 6-9.75 6-9.75-6-9.75-6Z"/><circle cx="12" cy="12" r="2.75"/></svg>
       </button>
-      <button class="action-btn icon-only" data-action="edit" data-id="${ticket.id}" type="button" title="${editTitle}" aria-label="${editTitle}" ${disabled}>
+      <button class="action-btn icon-only" data-action="edit" data-id="${ticket.id}" type="button" title="${editTitle}" aria-label="${editTitle}" ${editDisabled}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4.5L19.2 9.3a2.1 2.1 0 0 0 0-3L17.7 4.8a2.1 2.1 0 0 0-3 0L4 15.5V20Z"/><path d="m13.5 6 4.5 4.5"/></svg>
       </button>
-      <button class="action-btn icon-only danger" data-action="delete" data-id="${ticket.id}" type="button" title="${deleteTitle}" aria-label="${deleteTitle}" ${disabled}>
+      <button class="action-btn icon-only danger" data-action="delete" data-id="${ticket.id}" type="button" title="${effectiveDeleteTitle}" aria-label="${effectiveDeleteTitle}" ${deleteDisabled}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6.5 7l1 13h9l1-13"/><path d="M9 7V4h6v3"/></svg>
       </button>
     `;
@@ -1176,8 +1183,8 @@
     if (!confirmed) return;
 
     try {
-      await api(`/tickets/${id}`, {
-        method: "DELETE",
+      await api(`/tickets/${id}/delete`, {
+        method: "POST",
       });
       await loadTickets();
       showToast("Ticket excluído com sucesso.", "success");

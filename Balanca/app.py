@@ -303,9 +303,6 @@ def create_app() -> Flask:
         protected_fields = [
             ("placa_cavalo", ("placa_cavalo", "placaCavalo"), 16, "Placa Cavalo"),
             ("placa_tanque", ("placa_tanque", "placaTanque"), 16, "Placa Tanque"),
-            ("motorista", ("motorista",), 160, "Motorista"),
-            ("fornecedor_cliente", ("fornecedor_cliente", "fornecedorCliente"), 180, "Fornecedor/Cliente"),
-            ("transportadora", ("transportadora",), 180, "Transportadora"),
         ]
         changed = []
 
@@ -766,8 +763,7 @@ def create_app() -> Flask:
         finally:
             db.close()
 
-    @app.delete("/tickets/<int:ticket_id>")
-    def delete_ticket(ticket_id: int):
+    def _delete_ticket_response(ticket_id: int):
         data = request.get_json(silent=True) or {}
         db = SessionLocal()
         try:
@@ -777,11 +773,22 @@ def create_app() -> Flask:
             if _ticket_is_locked(ticket) and not _is_admin_request(data):
                 return fail("Ticket encerrado. Confirmação admin necessária para excluir.", 403)
 
+            if len(ticket.weighings or []) > 0 and not _is_admin_request(data):
+                return fail("Ticket com pesagem registrada. Confirmacao admin necessaria para excluir.", 403)
+
             db.delete(ticket)
             db.commit()
             return ok({"deleted": True, "id": ticket_id})
         finally:
             db.close()
+
+    @app.delete("/tickets/<int:ticket_id>")
+    def delete_ticket(ticket_id: int):
+        return _delete_ticket_response(ticket_id)
+
+    @app.post("/tickets/<int:ticket_id>/delete")
+    def delete_ticket_compat(ticket_id: int):
+        return _delete_ticket_response(ticket_id)
 
     @app.post("/tickets/<int:ticket_id>/close")
     def close_ticket(ticket_id: int):
