@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ticket de Balança</title>
+    <link rel="icon" type="image/png" href="/frontend/assets/logo-brava-2024-azul.png" />
+    <link rel="stylesheet" href="/frontend/ticket.css" />
+  </head>
+  <body>
+    <main class="sheet" id="ticket-sheet">
+      <header class="ticket-header">
+        <div class="logo-panel">
+          <img src="/frontend/assets/logo-brava-2024-azul-crop.png" alt="BRAVA Energia" />
+        </div>
+        <div class="header-info">
+          <h1 id="ticket-title">TICKET DE BALANÇA - PESAGEM COMPLETA</h1>
+          <strong>Brava Energia</strong>
+          <span>RN221, km 25</span>
+          <span>Guamaré-RN</span>
+          <span>www.bravaenergia.com</span>
+        </div>
+      </header>
+
+      <section class="ticket-meta">
+        <div><strong>Ticket de pesagem:</strong> <span id="ticket-code">--</span></div>
+        <div><strong>Pesagem:</strong> <span id="ticket-status">--</span></div>
+        <div><strong>Operação:</strong> <span id="ticket-operation">--</span></div>
+      </section>
+
+      <section class="field-grid">
+        <div class="field field-small">
+          <span>Placa Cavalo</span>
+          <strong id="placa-cavalo">--</strong>
+        </div>
+        <div class="field field-small">
+          <span>Placa Tanque</span>
+          <strong id="placa-tanque">--</strong>
+        </div>
+        <div class="field">
+          <span>Motorista</span>
+          <strong id="motorista">--</strong>
+        </div>
+        <div class="field">
+          <span>Fornecedor/Cliente</span>
+          <strong id="fornecedor">--</strong>
+        </div>
+        <div class="field">
+          <span>Transportadora</span>
+          <strong id="transportadora">--</strong>
+        </div>
+        <div class="field">
+          <span>Produto</span>
+          <strong id="produto">--</strong>
+        </div>
+        <div class="field">
+          <span>Destino/Procedência</span>
+          <strong id="destino">--</strong>
+        </div>
+      </section>
+
+      <div class="section-rule"></div>
+
+      <section class="weighing-list" id="weighings"></section>
+
+      <div class="section-rule"></div>
+
+      <section class="net-weight" id="net-weight">
+        <strong>PESO LÍQUIDO: <span id="peso-liquido">-- kg</span></strong>
+      </section>
+
+      <footer class="signatures">
+        <div><span>Ass. Motorista</span></div>
+        <div><span>Ass. Operador</span></div>
+      </footer>
+    </main>
+
+    <div class="print-actions no-print">
+      <button id="print" type="button">Imprimir / salvar PDF</button>
+    </div>
+
+    <script src="/frontend/ticket.js"></script>
+  </body>
+</html>

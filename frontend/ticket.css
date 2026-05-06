@@ -1,0 +1,361 @@
+:root {
+  color-scheme: light;
+  --ink: #000000;
+  --line: #000000;
+  --soft: #f3f3f3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f2f2f2;
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+}
+
+.sheet {
+  width: 180mm;
+  min-height: 142mm;
+  margin: 7mm auto;
+  padding: 3mm;
+  background: #ffffff;
+  border: 1pt solid var(--line);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+}
+
+.ticket-header {
+  display: grid;
+  grid-template-columns: 38mm 1fr;
+  gap: 2mm;
+  min-height: 18mm;
+  padding: 1.2mm 0 1.7mm;
+  border-bottom: 1pt solid var(--line);
+}
+
+.logo-panel {
+  display: flex;
+  align-items: flex-start;
+  padding-left: 1mm;
+}
+
+.logo-panel img {
+  width: 22mm;
+  height: auto;
+  object-fit: contain;
+}
+
+.header-info {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 0.25mm;
+  text-align: right;
+  font-size: 5.2pt;
+  line-height: 1.05;
+}
+
+.header-info h1 {
+  margin: 0 0 1mm;
+  font-size: 7pt;
+  font-style: italic;
+  font-weight: 900;
+  text-decoration: underline;
+}
+
+.header-info strong {
+  font-size: 5.6pt;
+}
+
+.ticket-meta {
+  display: flex;
+  gap: 6mm;
+  align-items: center;
+  padding: 2.2mm 0 1.7mm;
+  font-size: 7pt;
+}
+
+.ticket-meta strong,
+.field span,
+.weighing-block h2,
+.weighing-box dt {
+  font-size: 6.8pt;
+  font-weight: 900;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1.6mm;
+}
+
+.field {
+  display: grid;
+  grid-column: span 12;
+  gap: 1mm;
+}
+
+.field span {
+  display: block;
+}
+
+.field strong {
+  display: block;
+  min-height: 5.2mm;
+  border: 1pt solid var(--line);
+  padding: 1.2mm 1.6mm;
+  font-size: 6.8pt;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.field:nth-child(1),
+.field:nth-child(2) {
+  grid-column: span 3;
+}
+
+.field:nth-child(3) {
+  grid-column: span 6;
+}
+
+.field:nth-child(4),
+.field:nth-child(5),
+.field:nth-child(6),
+.field:nth-child(7) {
+  grid-column: span 6;
+}
+
+.section-rule {
+  height: 0;
+  margin: 2.4mm 0;
+  border-top: 1pt solid var(--line);
+}
+
+.weighing-list {
+  display: grid;
+  gap: 1.1mm;
+}
+
+.weighing-block {
+  display: grid;
+  gap: 0;
+}
+
+.weighing-block h2 {
+  margin: 0 0 0.8mm;
+  line-height: 1.05;
+}
+
+.weighing-box {
+  margin: 0;
+  min-height: 14mm;
+  display: grid;
+  align-content: center;
+  gap: 0.55mm;
+  border: 1pt solid var(--line);
+  padding: 1.2mm 2mm;
+  background: var(--soft);
+}
+
+.weighing-box div {
+  display: flex;
+  gap: 1.2mm;
+  align-items: baseline;
+  font-size: 6.8pt;
+}
+
+.weighing-box dt {
+  min-width: 18mm;
+}
+
+.weighing-box dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.net-weight {
+  display: grid;
+  place-items: center;
+  min-height: 9mm;
+  border: 1pt solid var(--line);
+  margin-top: 1.6mm;
+  font-size: 8.8pt;
+}
+
+.net-weight strong,
+.net-weight span {
+  font-size: 8.8pt;
+  font-weight: 900;
+}
+
+.signatures {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3mm;
+  margin-top: 2.4mm;
+}
+
+.signatures div {
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  height: 9.5mm;
+  border: 1pt solid var(--line);
+  padding-bottom: 1mm;
+}
+
+.signatures span {
+  font-size: 5.8pt;
+}
+
+.print-actions {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+}
+
+.print-actions button {
+  border: 0;
+  border-radius: 6px;
+  padding: 12px 16px;
+  background: #174a8b;
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    width: 210mm;
+    min-height: 297mm;
+    background: #ffffff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .sheet {
+    width: 150mm;
+    min-height: 122mm;
+    margin: 5mm auto 0;
+    padding: 2.4mm;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .ticket-header {
+    grid-template-columns: 32mm 1fr;
+    min-height: 15mm;
+    padding: 0.8mm 0 1.2mm;
+  }
+
+  .logo-panel img {
+    width: 18mm;
+  }
+
+  .header-info {
+    gap: 0.15mm;
+    font-size: 4.7pt;
+    line-height: 1.03;
+  }
+
+  .header-info h1 {
+    margin-bottom: 0.8mm;
+    font-size: 6.2pt;
+  }
+
+  .header-info strong {
+    font-size: 5pt;
+  }
+
+  .ticket-meta {
+    font-size: 6.3pt;
+  }
+
+  .ticket-meta {
+    gap: 4mm;
+    padding: 1.6mm 0 1.2mm;
+  }
+
+  .ticket-meta strong,
+  .field span,
+  .weighing-block h2,
+  .weighing-box dt {
+    font-size: 5.8pt;
+  }
+
+  .field-grid {
+    gap: 1.1mm;
+  }
+
+  .field strong {
+    min-height: 4.3mm;
+    padding: 0.8mm 1.2mm;
+    font-size: 5.9pt;
+    line-height: 1.15;
+  }
+
+  .section-rule {
+    margin: 1.8mm 0;
+  }
+
+  .weighing-list {
+    gap: 0.8mm;
+  }
+
+  .weighing-block h2 {
+    margin: 0 0 0.6mm;
+    line-height: 1.05;
+  }
+
+  .weighing-box {
+    margin: 0;
+    min-height: 10.8mm;
+    gap: 0.35mm;
+    padding: 0.9mm 1.5mm;
+  }
+
+  .weighing-box div {
+    gap: 1mm;
+    font-size: 5.9pt;
+  }
+
+  .weighing-box dt {
+    min-width: 15mm;
+  }
+
+  .net-weight {
+    min-height: 7mm;
+    margin-top: 1.2mm;
+  }
+
+  .net-weight strong,
+  .net-weight span {
+    font-size: 7.5pt;
+  }
+
+  .signatures {
+    gap: 2.2mm;
+    margin-top: 1.8mm;
+  }
+
+  .signatures div {
+    height: 7.5mm;
+    padding-bottom: 0.7mm;
+  }
+
+  .signatures span {
+    font-size: 5pt;
+  }
+}

@@ -4,3 +4,5 @@ SQLAlchemy==2.0.36
 pyodbc==5.2.0
 flasgger==0.9.7.1
 cryptography
+asgiref==3.11.0
+uvicorn==0.38.0

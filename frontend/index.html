@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gestão de Pesagem</title>
+    <link rel="icon" type="image/png" href="/frontend/assets/logo-brava-2024-azul.png" />
+    <link rel="stylesheet" href="/frontend/styles.css" />
+  </head>
+  <body>
+    <header class="app-shell">
+      <div class="brand-block">
+        <img src="/frontend/assets/logo-brava-2024-azul-crop.png" alt="BRAVA Energia" />
+        <div>
+          <p>Operação de Balança</p>
+          <h1>Gestão de Pesagem</h1>
+        </div>
+      </div>
+      <div class="admin-header">
+        <button class="admin-lock" id="admin-lock" type="button" title="Liberar modo admin" aria-label="Liberar modo admin">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        </button>
+        <span class="admin-email" id="current-user-email">--</span>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="list-view" id="list-view">
+        <div class="hero-panel">
+          <div>
+            <span class="kicker">Processo</span>
+            <h2>Tickets de pesagem</h2>            
+          </div>
+          <button class="btn btn-primary" id="start-ticket" type="button">Nova pesagem</button>
+        </div>
+
+        <div class="table-card">
+          <div class="table-toolbar">
+            <label class="date-field">
+              <span>Data</span>
+              <input id="ticket-date" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" />
+            </label>
+            <label class="search-field">
+              <span>Buscar registros</span>
+              <input id="ticket-search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore value="" placeholder="Placa, motorista, cliente, produto ou ticket" />
+            </label>
+            <select id="status-filter" aria-label="Filtrar status">
+              <option value="">Todos os status</option>
+              <option value="ABERTO">Abertos</option>
+              <option value="EM_ANDAMENTO">Em andamento</option>
+              <option value="COMPLETO">Encerrados</option>
+            </select>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Ticket</th>
+                  <th>Status</th>
+                  <th>Motorista</th>
+                  <th>Produto</th>
+                  <th>1ª Pesagem</th>
+                  <th>2ª Pesagem</th>
+                  <th>Peso líquido</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tickets-body"></tbody>
+            </table>
+          </div>
+          <div class="empty-table" id="empty-table">Nenhum ticket encontrado.</div>
+        </div>
+      </section>
+
+      <section class="operation-view hidden" id="operation-view">
+        <div class="operation-top">
+          <button class="btn btn-ghost icon-nav" id="back-to-list" type="button" title="Voltar à listagem" aria-label="Voltar à listagem">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 9 12l6 6"/><path d="M10 12h10"/></svg>
+          </button>
+          <div>
+            <span class="kicker" id="operation-status">ABERTO</span>
+            <h2 id="operation-title">Nova pesagem</h2>
+          </div>
+          <button class="btn btn-secondary" id="open-pdf" type="button">Visualizar Ticket</button>
+        </div>
+
+        <div class="operation-grid">
+          <form class="work-card entry-card" id="ticket-form">
+            <div class="card-title">
+              <div>
+                <span class="kicker">Cadastro</span>
+                <h3>Dados do veículo e carga</h3>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>Placa Cavalo</span>
+                <input id="placaCavalo" name="placa_cavalo" autocomplete="off" maxlength="16" data-uppercase data-catalog="horsePlates" aria-autocomplete="list" />
+              </label>
+              <label>
+                <span>Placa Tanque</span>
+                <input id="placaTanque" name="placa_tanque" autocomplete="off" maxlength="16" data-uppercase data-catalog="tankPlates" aria-autocomplete="list" />
+              </label>
+              <label>
+                <span>Motorista</span>
+                <input id="motorista" name="motorista" autocomplete="off" data-uppercase data-catalog="drivers" aria-autocomplete="list" />
+              </label>
+              <label>
+                <span>Fornecedor/Cliente</span>
+                <input id="fornecedorCliente" name="fornecedor_cliente" autocomplete="off" data-uppercase data-catalog="customers" aria-autocomplete="list" />
+              </label>
+              <label>
+                <span>Transportadora</span>
+                <input id="transportadora" name="transportadora" autocomplete="off" data-uppercase data-catalog="transporters" aria-autocomplete="list" />
+              </label>
+              <label>
+                <span>Produto</span>
+                <select id="produto" name="produto">
+                  <option value="">Selecione</option>
+                  <option value="GLP">GLP</option>
+                  <option value="QUIMICOS">Químicos</option>
+                  <option value="BORRA">Borra</option>
+                </select>
+              </label>
+              <label class="hidden" id="quimico-field">
+                <span>Especificação do Químico</span>
+                <input id="especificacaoQuimico" name="especificacao_quimico" autocomplete="off" data-uppercase data-catalog="chemicalSpecs" aria-autocomplete="list" />
+              </label>
+              <label>
+                <span>Destino/Procedência</span>
+                <input id="destinoProcedencia" name="destino_procedencia" autocomplete="off" data-uppercase data-catalog="destinations" aria-autocomplete="list" />
+              </label>
+            </div>
+          </form>
+
+          <aside class="work-card process-card">
+            <div class="card-title">
+              <div>
+                <span class="kicker">Balança 002</span>
+                <h3>Registro operacional</h3>
+              </div>
+              <span class="ticket-chip" id="ticket-code">--</span>
+            </div>
+
+            <div class="weight-strip">
+              <div>
+                <span>Inicial</span>
+                <strong id="peso-inicial">-- kg</strong>
+              </div>
+              <div>
+                <span>Final</span>
+                <strong id="peso-final">-- kg</strong>
+              </div>
+              <div class="net">
+                <span>Líquido</span>
+                <strong id="peso-liquido">-- kg</strong>
+              </div>
+            </div>
+
+            <button class="btn btn-primary wide" id="add-weighing" type="button">Nova leitura</button>
+            <p class="message" id="action-message" role="status" aria-live="polite"></p>
+
+            <div class="timeline" id="weighing-timeline"></div>
+            <button class="btn btn-secondary wide hidden" id="close-ticket" type="button">Encerrar ticket</button>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+    <div class="modal hidden" id="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-title">
+      <div class="modal-card">
+        <h2 id="admin-title">Modo admin</h2>
+        <p>Informe a senha administrativa para editar ou excluir tickets encerrados.</p>
+        <input class="autofill-decoy" type="text" name="username" autocomplete="username" tabindex="-1" aria-hidden="true" />
+        <label>
+          <span>Senha admin</span>
+          <input id="admin-password" type="password" name="admin_unlock_password" autocomplete="new-password" data-lpignore="true" data-1p-ignore />
+        </label>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="admin-cancel" type="button">Cancelar</button>
+          <button class="btn btn-primary" id="admin-confirm" type="button">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="app-modal" role="dialog" aria-modal="true" aria-labelledby="app-modal-title" aria-describedby="app-modal-message">
+      <div class="modal-card app-modal-card">
+        <h2 id="app-modal-title">Confirmação</h2>
+        <p id="app-modal-message"></p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" id="app-modal-cancel" type="button">Cancelar</button>
+          <button class="btn btn-primary" id="app-modal-confirm" type="button">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
+    <datalist id="horse-plates-list"></datalist>
+    <datalist id="tank-plates-list"></datalist>
+    <datalist id="drivers-list"></datalist>
+    <datalist id="transporters-list"></datalist>
+
+    <script src="/frontend/app.js"></script>
+  </body>
+</html>
