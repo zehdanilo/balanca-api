@@ -537,7 +537,7 @@
 
   async function loadCurrentOperator() {
     try {
-      const user = await api("/whoami");
+      const user = await api("/auth/whoami.aspx");
       const email = user?.email || user?.username || "Balança";
       const username = user?.username || String(email).split("@")[0] || "Balança";
       state.currentUser = {

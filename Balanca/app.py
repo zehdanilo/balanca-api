@@ -188,16 +188,150 @@ def create_app() -> Flask:
     def _user_agent() -> str:
         return (request.headers.get("User-Agent") or "")[:512]
 
+    def _windows_user_from_auth_token() -> str:
+        token_value = (
+            request.headers.get("X-IIS-WindowsAuthToken")
+            or request.environ.get("HTTP_X_IIS_WINDOWSAUTHTOKEN")
+            or ""
+        )
+        if not token_value:
+            return ""
+
+        should_close_token = False
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            token_text = str(token_value).strip()
+            try:
+                token_handle = int(token_text, 0)
+            except ValueError:
+                token_handle = int(token_text, 16)
+            if not token_handle:
+                return ""
+
+            advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            token_user = 1
+            error_insufficient_buffer = 122
+
+            advapi32.GetTokenInformation.argtypes = [
+                wintypes.HANDLE,
+                wintypes.DWORD,
+                wintypes.LPVOID,
+                wintypes.DWORD,
+                ctypes.POINTER(wintypes.DWORD),
+            ]
+            advapi32.GetTokenInformation.restype = wintypes.BOOL
+            advapi32.LookupAccountSidW.argtypes = [
+                wintypes.LPCWSTR,
+                wintypes.LPVOID,
+                wintypes.LPWSTR,
+                ctypes.POINTER(wintypes.DWORD),
+                wintypes.LPWSTR,
+                ctypes.POINTER(wintypes.DWORD),
+                ctypes.POINTER(wintypes.DWORD),
+            ]
+            advapi32.LookupAccountSidW.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
+
+            class SidAndAttributes(ctypes.Structure):
+                _fields_ = [("Sid", wintypes.LPVOID), ("Attributes", wintypes.DWORD)]
+
+            class TokenUser(ctypes.Structure):
+                _fields_ = [("User", SidAndAttributes)]
+
+            required = wintypes.DWORD(0)
+            advapi32.GetTokenInformation(
+                wintypes.HANDLE(token_handle),
+                token_user,
+                None,
+                0,
+                ctypes.byref(required),
+            )
+            if ctypes.get_last_error() != error_insufficient_buffer or not required.value:
+                return ""
+            should_close_token = True
+
+            buffer = ctypes.create_string_buffer(required.value)
+            if not advapi32.GetTokenInformation(
+                wintypes.HANDLE(token_handle),
+                token_user,
+                buffer,
+                required,
+                ctypes.byref(required),
+            ):
+                return ""
+
+            user = ctypes.cast(buffer, ctypes.POINTER(TokenUser)).contents
+            sid = user.User.Sid
+            name_len = wintypes.DWORD(0)
+            domain_len = wintypes.DWORD(0)
+            sid_type = wintypes.DWORD(0)
+
+            advapi32.LookupAccountSidW(
+                None,
+                sid,
+                None,
+                ctypes.byref(name_len),
+                None,
+                ctypes.byref(domain_len),
+                ctypes.byref(sid_type),
+            )
+            if not name_len.value:
+                return ""
+
+            name = ctypes.create_unicode_buffer(name_len.value)
+            domain = ctypes.create_unicode_buffer(max(domain_len.value, 1))
+            if not advapi32.LookupAccountSidW(
+                None,
+                sid,
+                name,
+                ctypes.byref(name_len),
+                domain,
+                ctypes.byref(domain_len),
+                ctypes.byref(sid_type),
+            ):
+                return ""
+
+            domain_value = domain.value.strip()
+            name_value = name.value.strip()
+            if domain_value and name_value:
+                return f"{domain_value}\\{name_value}"
+            return name_value
+        except Exception:
+            return ""
+        finally:
+            if should_close_token:
+                try:
+                    kernel32.CloseHandle(wintypes.HANDLE(token_handle))
+                except Exception:
+                    pass
+
     def _current_operator_payload() -> dict:
         candidates = {
+            "X-IIS-WindowsAuthToken": _windows_user_from_auth_token(),
+            "REMOTE_USER": request.environ.get("REMOTE_USER"),
+            "LOGON_USER": request.environ.get("LOGON_USER"),
+            "AUTH_USER": request.environ.get("AUTH_USER"),
+            "REMOTE_IDENT": request.environ.get("REMOTE_IDENT"),
+            "HTTP_REMOTE_USER": request.environ.get("HTTP_REMOTE_USER"),
+            "HTTP_LOGON_USER": request.environ.get("HTTP_LOGON_USER"),
+            "HTTP_AUTH_USER": request.environ.get("HTTP_AUTH_USER"),
+            "HTTP_X_REMOTE_USER": request.environ.get("HTTP_X_REMOTE_USER"),
+            "HTTP_X_FORWARDED_USER": request.environ.get("HTTP_X_FORWARDED_USER"),
+            "HTTP_X_FORWARDED_EMAIL": request.environ.get("HTTP_X_FORWARDED_EMAIL"),
+            "HTTP_X_AUTHENTICATED_USER": request.environ.get("HTTP_X_AUTHENTICATED_USER"),
+            "X-IIS-Remote-User": request.headers.get("X-IIS-Remote-User"),
+            "X-IIS-Windows-User": request.headers.get("X-IIS-Windows-User"),
+            "X-Original-User": request.headers.get("X-Original-User"),
+            "X-Original-Remote-User": request.headers.get("X-Original-Remote-User"),
             "X-User-Email": request.headers.get("X-User-Email"),
             "X-Forwarded-Email": request.headers.get("X-Forwarded-Email"),
             "X-Forwarded-User": request.headers.get("X-Forwarded-User"),
             "X-Remote-User": request.headers.get("X-Remote-User"),
             "X-Authenticated-User": request.headers.get("X-Authenticated-User"),
-            "REMOTE_USER": request.environ.get("REMOTE_USER"),
-            "LOGON_USER": request.environ.get("LOGON_USER"),
-            "AUTH_USER": request.environ.get("AUTH_USER"),
         }
 
         raw_user = ""
@@ -229,6 +363,7 @@ def create_app() -> Flask:
             "username": username or display,
             "email": display,
             "source": source,
+            "auth_type": request.environ.get("AUTH_TYPE") or request.headers.get("X-Auth-Type") or "",
             "authenticated": bool(raw_user),
         }
 
@@ -528,6 +663,10 @@ def create_app() -> Flask:
 
     @app.get("/whoami")
     def whoami():
+        return ok(_current_operator_payload())
+
+    @app.get("/auth/whoami.aspx")
+    def whoami_iis_auth():
         return ok(_current_operator_payload())
 
     @app.get("/catalog/tank-plates")
