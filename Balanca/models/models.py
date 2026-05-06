@@ -154,6 +154,8 @@ class WeighingTicket(Base):
     produto = Column(String(32), nullable=False, default="")
     especificacao_quimico = Column(String(180), nullable=False, default="")
     destino_procedencia = Column(String(180), nullable=False, default="")
+    tara = Column(Integer, nullable=True)
+    observacao = Column(String(500), nullable=True, default="")
 
     peso_inicial = Column(Integer, nullable=True)
     peso_final = Column(Integer, nullable=True)
@@ -184,6 +186,8 @@ class WeighingTicket(Base):
             "produto": self.produto,
             "especificacao_quimico": self.especificacao_quimico,
             "destino_procedencia": self.destino_procedencia,
+            "tara": self.tara,
+            "observacao": self.observacao or "",
             "peso_inicial": self.peso_inicial,
             "peso_final": self.peso_final,
             "peso_liquido": self.peso_liquido,

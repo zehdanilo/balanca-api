@@ -9,6 +9,10 @@
   box-sizing: border-box;
 }
 
+.hidden {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: #f2f2f2;
@@ -123,9 +127,19 @@ body {
 }
 
 .field:nth-child(4),
-.field:nth-child(5),
-.field:nth-child(6),
+.field:nth-child(5) {
+  grid-column: span 6;
+}
+
+.field:nth-child(6) {
+  grid-column: span 4;
+}
+
 .field:nth-child(7) {
+  grid-column: span 2;
+}
+
+.field:nth-child(8) {
   grid-column: span 6;
 }
 

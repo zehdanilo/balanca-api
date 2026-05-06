@@ -434,6 +434,17 @@ def create_app() -> Flask:
         normalized = " ".join(str(value or "").strip().upper().split())
         return normalized[:limit]
 
+    def _normalize_optional_int_value(value, default=None):
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        try:
+            number = int(float(str(value).strip().replace(",", ".")))
+        except (TypeError, ValueError):
+            return default
+        return max(number, 0)
+
     def _protected_in_progress_changes(ticket: WeighingTicket, data: dict) -> list[str]:
         protected_fields = [
             ("placa_cavalo", ("placa_cavalo", "placaCavalo"), 16, "Placa Cavalo"),
@@ -504,6 +515,13 @@ def create_app() -> Flask:
                 default=ticket.destino_procedencia,
             ),
             180,
+        )
+        if "tara" in data or "taraKg" in data:
+            tara_value = data.get("tara") if "tara" in data else data.get("taraKg")
+            ticket.tara = _normalize_optional_int_value(tara_value, default=ticket.tara)
+        ticket.observacao = _normalize_text_value(
+            _ticket_payload_value(data, "observacao", "observacaoRetificacao", default=ticket.observacao),
+            500,
         )
         ticket.updated_at = _now_local()
 
@@ -663,11 +681,15 @@ def create_app() -> Flask:
 
     @app.get("/whoami")
     def whoami():
-        return ok(_current_operator_payload())
+        response = ok(_current_operator_payload())
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.get("/auth/whoami.aspx")
     def whoami_iis_auth():
-        return ok(_current_operator_payload())
+        response = ok(_current_operator_payload())
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.get("/catalog/tank-plates")
     def catalog_tank_plates():
@@ -840,6 +862,7 @@ def create_app() -> Flask:
                         WeighingTicket.transportadora.ilike(like),
                         WeighingTicket.produto.ilike(like),
                         WeighingTicket.destino_procedencia.ilike(like),
+                        WeighingTicket.observacao.ilike(like),
                     )
                 )
 

@@ -726,6 +726,13 @@ td strong {
   gap: 14px;
 }
 
+.inline-field-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(92px, 0.34fr);
+  gap: 10px;
+  min-width: 0;
+}
+
 .process-card {
   position: sticky;
   top: 18px;

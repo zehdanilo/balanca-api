@@ -19,6 +19,8 @@
     produto: "",
     especificacao_quimico: "",
     destino_procedencia: "",
+    tara: null,
+    observacao: "",
     peso_inicial: null,
     peso_final: null,
     peso_liquido: null,
@@ -310,6 +312,13 @@
     return String(value || "").trim().replace(/\s+/g, " ").toLocaleUpperCase("pt-BR");
   }
 
+  function normalizeOptionalInteger(value) {
+    const normalized = String(value ?? "").trim();
+    if (!normalized) return null;
+    const parsed = Number.parseInt(normalized, 10);
+    return Number.isNaN(parsed) ? null : Math.max(parsed, 0);
+  }
+
   function uppercaseInput(input) {
     if (!input?.hasAttribute("data-uppercase")) return;
     const start = input.selectionStart;
@@ -537,7 +546,10 @@
 
   async function loadCurrentOperator() {
     try {
-      const user = await api("/auth/whoami.aspx");
+      const user = await api(`/auth/whoami.aspx?t=${Date.now()}`, {
+        cache: "no-store",
+        credentials: "include",
+      });
       const email = user?.email || user?.username || "Balança";
       const username = user?.username || String(email).split("@")[0] || "Balança";
       state.currentUser = {
@@ -684,6 +696,8 @@
       produto: field("produto").value,
       especificacao_quimico: normalizeText(field("especificacaoQuimico").value),
       destino_procedencia: normalizeText(field("destinoProcedencia").value),
+      tara: normalizeOptionalInteger(field("tara").value),
+      observacao: normalizeText(field("observacao").value),
     };
   }
 
@@ -696,6 +710,8 @@
     field("produto").value = ticket.produto || "";
     field("especificacaoQuimico").value = normalizeText(ticket.especificacao_quimico);
     field("destinoProcedencia").value = normalizeText(ticket.destino_procedencia);
+    field("tara").value = ticket.tara ?? "";
+    field("observacao").value = normalizeText(ticket.observacao);
     els.quimicoField.classList.toggle("hidden", ticket.produto !== "QUIMICOS");
   }
 
@@ -976,6 +992,8 @@
       data.produto,
       data.especificacao_quimico,
       data.destino_procedencia,
+      data.tara,
+      data.observacao,
     ].some(Boolean);
   }
 

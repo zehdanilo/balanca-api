@@ -132,7 +132,12 @@
       text("fornecedor", ticket.fornecedor_cliente);
       text("transportadora", ticket.transportadora);
       text("produto", productLabel(ticket));
+      document.getElementById("tara").textContent =
+        ticket.tara === null || ticket.tara === undefined ? "" : formatKg(ticket.tara);
       text("destino", ticket.destino_procedencia);
+      const observacao = String(ticket.observacao || "").trim();
+      document.getElementById("observacao").closest(".field").classList.toggle("hidden", !observacao);
+      text("observacao", observacao);
       const netWeight = document.getElementById("net-weight");
       netWeight.style.display = shouldShowLiquidWeight(ticket) ? "grid" : "none";
       text("peso-liquido", formatKg(ticket.peso_liquido));

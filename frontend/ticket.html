@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Ticket de Balança</title>
     <link rel="icon" type="image/png" href="/frontend/assets/logo-brava-2024-azul.png" />
-    <link rel="stylesheet" href="/frontend/ticket.css" />
+    <link rel="stylesheet" href="/frontend/ticket.css?v=20260506-observacao-optional" />
   </head>
   <body>
     <main class="sheet" id="ticket-sheet">
@@ -54,8 +54,16 @@
           <strong id="produto">--</strong>
         </div>
         <div class="field">
+          <span>Tara</span>
+          <strong id="tara">--</strong>
+        </div>
+        <div class="field">
           <span>Destino/Procedência</span>
           <strong id="destino">--</strong>
+        </div>
+        <div class="field">
+          <span>Observação</span>
+          <strong id="observacao">--</strong>
         </div>
       </section>
 
@@ -79,6 +87,6 @@
       <button id="print" type="button">Imprimir / salvar PDF</button>
     </div>
 
-    <script src="/frontend/ticket.js"></script>
+    <script src="/frontend/ticket.js?v=20260506-tara-clear"></script>
   </body>
 </html>

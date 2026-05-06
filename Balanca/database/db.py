@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from ..config import settings
 
@@ -34,3 +34,20 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, futu
 def init_db():
     from ..models.models import Base
     Base.metadata.create_all(bind=engine)
+    _ensure_weighing_ticket_columns()
+
+
+def _ensure_weighing_ticket_columns():
+    inspector = inspect(engine)
+    columns = {column["name"].lower() for column in inspector.get_columns("balanca_weighing_tickets")}
+    missing_columns = []
+    if "tara" not in columns:
+        missing_columns.append("ALTER TABLE balanca_weighing_tickets ADD tara INT NULL")
+    if "observacao" not in columns:
+        missing_columns.append("ALTER TABLE balanca_weighing_tickets ADD observacao NVARCHAR(500) NULL")
+    if not missing_columns:
+        return
+
+    with engine.begin() as conn:
+        for statement in missing_columns:
+            conn.execute(text(statement))
