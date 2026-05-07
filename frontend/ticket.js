@@ -8,6 +8,14 @@
   const params = new URLSearchParams(window.location.search);
   const ticketId = params.get("id");
   const shouldAutoPrint = params.get("print") === "1";
+  const printButton = document.getElementById("print");
+  let ticketReadyToPrint = false;
+
+  function setPrintReady(ready) {
+    ticketReadyToPrint = ready;
+    printButton.disabled = !ready;
+    printButton.textContent = ready ? "Imprimir / salvar PDF" : "Carregando ticket...";
+  }
 
   async function api(path) {
     const response = await fetch(path, {
@@ -205,14 +213,20 @@
       netWeight.style.display = shouldShowLiquidWeight(ticket) ? "grid" : "none";
       text("peso-liquido", formatKg(liquidWeight(ticket)));
       renderWeighings(ticket);
+      setPrintReady(true);
       if (shouldAutoPrint) {
         setTimeout(() => window.print(), 350);
       }
     } catch (error) {
+      setPrintReady(false);
       document.body.innerHTML = error.message;
     }
   }
 
-  document.getElementById("print").addEventListener("click", () => window.print());
+  printButton.addEventListener("click", () => {
+    if (!ticketReadyToPrint) return;
+    window.print();
+  });
+  setPrintReady(false);
   init();
 })();

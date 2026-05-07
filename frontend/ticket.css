@@ -269,6 +269,12 @@ body {
   cursor: pointer;
 }
 
+.print-actions button:disabled {
+  background: #8a96a8;
+  cursor: wait;
+  opacity: 0.82;
+}
+
 @page {
   size: A4;
   margin: 0;
