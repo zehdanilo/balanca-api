@@ -401,6 +401,22 @@ def create_app() -> Flask:
             admin_password = str(data.get("admin_password") or data.get("adminPassword") or "")
         return admin_password == ADMIN_PASSWORD
 
+    def _operator_name_from_payload(operator_payload: dict, data: dict | None = None) -> str:
+        ignored = {"", "BALANCA", "BALANÇA", "USUARIO NAO IDENTIFICADO", "USUÁRIO NÃO IDENTIFICADO"}
+        candidates = [
+            operator_payload.get("email") if operator_payload.get("authenticated") else "",
+            operator_payload.get("username") if operator_payload.get("authenticated") else "",
+            (data or {}).get("operador"),
+            (data or {}).get("operator"),
+        ]
+
+        for value in candidates:
+            normalized = " ".join(str(value or "").strip().split())
+            if normalized and normalized.upper() not in ignored:
+                return normalized[:120]
+
+        return "Balança"
+
     def _ticket_is_locked(ticket: WeighingTicket) -> bool:
         return (ticket.status or "").upper() == "COMPLETO"
 
@@ -519,6 +535,14 @@ def create_app() -> Flask:
         if "tara" in data or "taraKg" in data:
             tara_value = data.get("tara") if "tara" in data else data.get("taraKg")
             ticket.tara = _normalize_optional_int_value(tara_value, default=ticket.tara)
+        ticket.num_agendamento = _normalize_text_value(
+            _ticket_payload_value(data, "num_agendamento", "numAgendamento", default=ticket.num_agendamento),
+            80,
+        )
+        ticket.lacre = _normalize_text_value(
+            _ticket_payload_value(data, "lacre", default=ticket.lacre),
+            500,
+        )
         ticket.observacao = _normalize_text_value(
             _ticket_payload_value(data, "observacao", "observacaoRetificacao", default=ticket.observacao),
             500,
@@ -862,6 +886,8 @@ def create_app() -> Flask:
                         WeighingTicket.transportadora.ilike(like),
                         WeighingTicket.produto.ilike(like),
                         WeighingTicket.destino_procedencia.ilike(like),
+                        WeighingTicket.num_agendamento.ilike(like),
+                        WeighingTicket.lacre.ilike(like),
                         WeighingTicket.observacao.ilike(like),
                     )
                 )
@@ -1004,6 +1030,8 @@ def create_app() -> Flask:
 
             sequence = len(ticket.weighings or []) + 1
             operator_payload = _current_operator_payload()
+            operador = _operator_name_from_payload(operator_payload, data)
+
             record = WeighingRecord(
                 ticket_id=ticket.id,
                 reading_id=source.get("id") or data.get("reading_id") or data.get("readingId"),
@@ -1014,7 +1042,7 @@ def create_app() -> Flask:
                 ),
                 balanca=str(data.get("balanca") or "Balança 002")[:80],
                 peso=peso,
-                operador=str(data.get("operador") or data.get("operator") or operator_payload.get("email") or "Balança")[:120],
+                operador=operador,
             )
 
             db.add(record)

@@ -45,9 +45,15 @@ def _ensure_weighing_ticket_columns():
         missing_columns.append("ALTER TABLE balanca_weighing_tickets ADD tara INT NULL")
     if "observacao" not in columns:
         missing_columns.append("ALTER TABLE balanca_weighing_tickets ADD observacao NVARCHAR(500) NULL")
+    if "num_agendamento" not in columns:
+        missing_columns.append("ALTER TABLE balanca_weighing_tickets ADD num_agendamento NVARCHAR(80) NULL")
+    if "lacre" not in columns:
+        missing_columns.append("ALTER TABLE balanca_weighing_tickets ADD lacre NVARCHAR(500) NULL")
     if not missing_columns:
         return
 
     with engine.begin() as conn:
         for statement in missing_columns:
             conn.execute(text(statement))
+        if "lacre" in columns:
+            conn.execute(text("ALTER TABLE balanca_weighing_tickets ALTER COLUMN lacre NVARCHAR(500) NULL"))

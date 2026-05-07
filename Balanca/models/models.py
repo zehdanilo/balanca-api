@@ -15,6 +15,12 @@ from ..database.base import Base
 SQLSERVER_NOW_UTC_MINUS_3 = text("DATEADD(HOUR, -3, GETUTCDATE())")
 
 
+def _operator_label(value) -> str:
+    normalized = " ".join(str(value or "").strip().split())
+    ignored = {"", "BALANCA", "BALANÇA", "USUARIO NAO IDENTIFICADO", "USUÁRIO NÃO IDENTIFICADO"}
+    return "Balança" if normalized.upper() in ignored else normalized
+
+
 class ApiAccessLog(Base):
     __tablename__ = "balanca_access_log"
 
@@ -155,6 +161,8 @@ class WeighingTicket(Base):
     especificacao_quimico = Column(String(180), nullable=False, default="")
     destino_procedencia = Column(String(180), nullable=False, default="")
     tara = Column(Integer, nullable=True)
+    num_agendamento = Column(String(80), nullable=True, default="")
+    lacre = Column(String(500), nullable=True, default="")
     observacao = Column(String(500), nullable=True, default="")
 
     peso_inicial = Column(Integer, nullable=True)
@@ -187,6 +195,8 @@ class WeighingTicket(Base):
             "especificacao_quimico": self.especificacao_quimico,
             "destino_procedencia": self.destino_procedencia,
             "tara": self.tara,
+            "num_agendamento": self.num_agendamento or "",
+            "lacre": self.lacre or "",
             "observacao": self.observacao or "",
             "peso_inicial": self.peso_inicial,
             "peso_final": self.peso_final,
@@ -232,7 +242,7 @@ class WeighingRecord(Base):
             "data_hora": self.data_hora.isoformat() if self.data_hora else None,
             "balanca": self.balanca,
             "peso": self.peso,
-            "operador": self.operador,
+            "operador": _operator_label(self.operador),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

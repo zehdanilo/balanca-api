@@ -25,6 +25,13 @@
     document.getElementById(id).textContent = value || "--";
   }
 
+  function optionalText(id, value) {
+    const element = document.getElementById(id);
+    const normalized = String(value || "").trim();
+    element.closest(".field").classList.toggle("hidden", !normalized);
+    element.textContent = normalized;
+  }
+
   function formatKg(value) {
     if (value === null || value === undefined || Number.isNaN(Number(value))) {
       return "-- kg";
@@ -46,6 +53,16 @@
       return "Balança 002";
     }
     return normalized;
+  }
+
+  function normalizeText(value) {
+    return String(value || "").trim().replace(/\s+/g, " ").toLocaleUpperCase("pt-BR");
+  }
+
+  function operatorLabel(value) {
+    const normalized = normalizeText(value);
+    const ignored = new Set(["", "BALANCA", "BALANÇA", "USUARIO NAO IDENTIFICADO", "USUÁRIO NÃO IDENTIFICADO"]);
+    return ignored.has(normalized) ? "Balança" : normalized;
   }
 
   function productLabel(ticket) {
@@ -106,7 +123,7 @@
           <div><dt>Data/hora:</dt><dd>${formatDate(record.data_hora)}</dd></div>
           <div><dt>Balança:</dt><dd>${scaleLabel(record.balanca)}</dd></div>
           <div><dt>Peso:</dt><dd>${formatKg(record.peso)}</dd></div>
-          <div><dt>Operador:</dt><dd>${record.operador || "Balança"}</dd></div>
+          <div><dt>Operador:</dt><dd>${operatorLabel(record.operador)}</dd></div>
         </dl>
       `;
       container.appendChild(card);
@@ -135,6 +152,8 @@
       document.getElementById("tara").textContent =
         ticket.tara === null || ticket.tara === undefined ? "" : formatKg(ticket.tara);
       text("destino", ticket.destino_procedencia);
+      optionalText("num-agendamento", ticket.num_agendamento);
+      optionalText("lacre", ticket.lacre);
       const observacao = String(ticket.observacao || "").trim();
       document.getElementById("observacao").closest(".field").classList.toggle("hidden", !observacao);
       text("observacao", observacao);

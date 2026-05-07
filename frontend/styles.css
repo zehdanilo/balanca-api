@@ -733,6 +733,98 @@ td strong {
   min-width: 0;
 }
 
+.cargo-line {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1.22fr) minmax(0, 0.9fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.cargo-line:has(#quimico-field:not(.hidden)) {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.82fr) minmax(0, 0.95fr);
+}
+
+.inline-field-duo {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1.5fr) minmax(150px, 0.75fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.full-line {
+  grid-column: 1 / -1;
+}
+
+.lacres-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lacres-header {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  align-items: center;
+}
+
+.lacres-header span {
+  color: #344054;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.lacres-list {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.lacre-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lacre-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  border: 1px solid #c8d3df;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--blue-2);
+  cursor: pointer;
+}
+
+.lacre-icon-btn:hover {
+  border-color: var(--blue);
+  background: #eef6ff;
+}
+
+.lacre-icon-btn:disabled {
+  border-color: #d5dce5;
+  background: #eef1f5;
+  color: #667085;
+  cursor: not-allowed;
+}
+
+.lacre-icon-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .process-card {
   position: sticky;
   top: 18px;
@@ -1012,6 +1104,13 @@ td strong {
   .table-toolbar,
   .form-grid,
   .weight-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .cargo-line,
+  .cargo-line:has(#quimico-field:not(.hidden)),
+  .inline-field-duo,
+  .inline-field-pair {
     grid-template-columns: 1fr;
   }
 

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Gestão de Pesagem</title>
     <link rel="icon" type="image/png" href="/frontend/assets/logo-brava-2024-azul.png" />
-    <link rel="stylesheet" href="/frontend/styles.css?v=20260506-observacao-field" />
+    <link rel="stylesheet" href="/frontend/styles.css?v=20260506-lacres-compactos" />
   </head>
   <body>
     <header class="app-shell">
@@ -42,7 +42,7 @@
             </label>
             <label class="search-field">
               <span>Buscar registros</span>
-              <input id="ticket-search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore value="" placeholder="Placa, motorista, cliente, produto, observacao ou ticket" />
+              <input id="ticket-search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore value="" placeholder="Placa, motorista, cliente, produto, lacre, agendamento ou ticket" />
             </label>
             <select id="status-filter" aria-label="Filtrar status">
               <option value="">Todos os status</option>
@@ -112,37 +112,54 @@
                 <span>Fornecedor/Cliente</span>
                 <input id="fornecedorCliente" name="fornecedor_cliente" autocomplete="off" data-uppercase data-catalog="customers" aria-autocomplete="list" />
               </label>
-              <label>
-                <span>Transportadora</span>
-                <input id="transportadora" name="transportadora" autocomplete="off" data-uppercase data-catalog="transporters" aria-autocomplete="list" />
-              </label>
-              <div class="inline-field-pair">
+              <div class="cargo-line">
                 <label>
-                  <span>Produto</span>
-                  <select id="produto" name="produto">
-                    <option value="">Selecione</option>
-                    <option value="GLP">GLP</option>
-                    <option value="QUIMICOS">Químicos</option>
-                    <option value="BORRA">Borra</option>
-                  </select>
+                  <span>Transportadora</span>
+                  <input id="transportadora" name="transportadora" autocomplete="off" data-uppercase data-catalog="transporters" aria-autocomplete="list" />
                 </label>
-                <label>
-                  <span>Tara</span>
-                  <input id="tara" name="tara" type="number" inputmode="numeric" min="0" step="1" placeholder="kg" />
+                <div class="inline-field-pair">
+                  <label>
+                    <span>Produto</span>
+                    <select id="produto" name="produto">
+                      <option value="">Selecione</option>
+                      <option value="GLP">GLP</option>
+                      <option value="QUIMICOS">Químicos</option>
+                      <option value="BORRA">Borra</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Tara</span>
+                    <input id="tara" name="tara" type="number" inputmode="numeric" min="0" step="1" placeholder="kg" />
+                  </label>
+                </div>
+                <label class="hidden" id="quimico-field">
+                  <span>Especificação do Químico</span>
+                  <input id="especificacaoQuimico" name="especificacao_quimico" autocomplete="off" data-uppercase data-catalog="chemicalSpecs" aria-autocomplete="list" />
                 </label>
               </div>
-              <label class="hidden" id="quimico-field">
-                <span>Especificação do Químico</span>
-                <input id="especificacaoQuimico" name="especificacao_quimico" autocomplete="off" data-uppercase data-catalog="chemicalSpecs" aria-autocomplete="list" />
-              </label>
-              <label>
-                <span>Destino/Procedência</span>
-                <input id="destinoProcedencia" name="destino_procedencia" autocomplete="off" data-uppercase data-catalog="destinations" aria-autocomplete="list" />
-              </label>
-              <label>
+              <div class="inline-field-duo">
+                <label>
+                  <span>Destino/Procedência</span>
+                  <input id="destinoProcedencia" name="destino_procedencia" autocomplete="off" data-uppercase data-catalog="destinations" aria-autocomplete="list" />
+                </label>
+                <label>
+                  <span>Num. Agendamento</span>
+                  <input id="numAgendamento" name="num_agendamento" autocomplete="off" maxlength="80" data-uppercase />
+                </label>
+              </div>
+              <label class="full-line">
                 <span>Observação</span>
                 <input id="observacao" name="observacao" autocomplete="off" maxlength="500" data-uppercase />
               </label>
+              <div class="lacres-field full-line">
+                <div class="lacres-header">
+                  <span>Lacres</span>
+                  <button class="lacre-icon-btn" data-lacre-action="add" type="button" title="Adicionar lacre" aria-label="Adicionar lacre">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                  </button>
+                </div>
+                <div class="lacres-list" id="lacres-list"></div>
+              </div>
             </div>
           </form>
 
@@ -214,6 +231,6 @@
     <datalist id="drivers-list"></datalist>
     <datalist id="transporters-list"></datalist>
 
-    <script src="/frontend/app.js?v=20260506-auth-nostore"></script>
+    <script src="/frontend/app.js?v=20260507-operador-balanca-label"></script>
   </body>
 </html>

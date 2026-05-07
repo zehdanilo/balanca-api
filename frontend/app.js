@@ -20,6 +20,8 @@
     especificacao_quimico: "",
     destino_procedencia: "",
     tara: null,
+    num_agendamento: "",
+    lacre: "",
     observacao: "",
     peso_inicial: null,
     peso_final: null,
@@ -73,6 +75,7 @@
     openPdf: document.getElementById("open-pdf"),
     ticketForm: document.getElementById("ticket-form"),
     quimicoField: document.getElementById("quimico-field"),
+    lacresList: document.getElementById("lacres-list"),
     operationStatus: document.getElementById("operation-status"),
     operationTitle: document.getElementById("operation-title"),
     ticketCode: document.getElementById("ticket-code"),
@@ -312,11 +315,66 @@
     return String(value || "").trim().replace(/\s+/g, " ").toLocaleUpperCase("pt-BR");
   }
 
+  function operatorLabel(value) {
+    const normalized = normalizeText(value);
+    const ignored = new Set(["", "BALANCA", "BALANÇA", "USUARIO NAO IDENTIFICADO", "USUÁRIO NÃO IDENTIFICADO"]);
+    return ignored.has(normalized) ? "Balança" : normalized;
+  }
+
   function normalizeOptionalInteger(value) {
     const normalized = String(value ?? "").trim();
     if (!normalized) return null;
     const parsed = Number.parseInt(normalized, 10);
     return Number.isNaN(parsed) ? null : Math.max(parsed, 0);
+  }
+
+  function splitLacres(value) {
+    return String(value || "")
+      .split(/[,;\n]+/)
+      .map(normalizeText)
+      .filter(Boolean);
+  }
+
+  function updateLacreRemoveState() {
+    const rows = [...els.lacresList.querySelectorAll(".lacre-row")];
+    rows.forEach((row) => {
+      const removeButton = row.querySelector("[data-lacre-action='remove']");
+      if (removeButton) {
+        removeButton.disabled = rows.length <= 1 && !row.querySelector("input")?.value.trim();
+      }
+    });
+  }
+
+  function addLacreInput(value = "") {
+    const row = document.createElement("div");
+    row.className = "lacre-row";
+    row.innerHTML = `
+      <input name="lacre_item" autocomplete="off" maxlength="80" data-uppercase value="${escapeHtml(value)}" />
+      <button class="lacre-icon-btn" data-lacre-action="remove" type="button" title="Remover lacre" aria-label="Remover lacre">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+      </button>
+    `;
+    els.lacresList.appendChild(row);
+    updateLacreRemoveState();
+    return row.querySelector("input");
+  }
+
+  function renderLacres(value) {
+    els.lacresList.innerHTML = "";
+    const lacres = splitLacres(value);
+    (lacres.length ? lacres : [""]).forEach(addLacreInput);
+    updateLacreRemoveState();
+  }
+
+  function lacresFromForm() {
+    return [...els.lacresList.querySelectorAll("input[name='lacre_item']")]
+      .map((input) => normalizeText(input.value))
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  function currentOperatorNameForPayload() {
+    return operatorLabel(state.currentUser.username);
   }
 
   function uppercaseInput(input) {
@@ -545,11 +603,52 @@
   }
 
   async function loadCurrentOperator() {
-    try {
-      const user = await api(`/auth/whoami.aspx?t=${Date.now()}`, {
+    els.currentUserEmail.textContent = "Identificando...";
+    els.currentUserEmail.title = "Identificando usuario do Windows";
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const requestOperator = async (path) => {
+      const response = await fetch(`${path}${path.includes("?") ? "&" : "?"}t=${Date.now()}`, {
         cache: "no-store",
         credentials: "include",
+        headers: { Accept: "application/json" },
       });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        const error = new Error(payload?.error?.message || `Falha na API (${response.status}).`);
+        error.status = response.status;
+        throw error;
+      }
+      if (!payload.data?.authenticated) {
+        const error = new Error("Usuario Windows nao identificado.");
+        error.status = 401;
+        throw error;
+      }
+      return payload.data;
+    };
+
+    try {
+      let user = null;
+      let lastError = null;
+      const attempts = [
+        { delay: 0, path: "/auth/whoami.aspx" },
+        { delay: 700, path: "/auth/whoami.aspx" },
+        { delay: 1500, path: "/auth/whoami.aspx" },
+        { delay: 2500, path: "/auth/whoami.aspx" },
+        { delay: 1000, path: "/whoami" },
+      ];
+
+      for (const attempt of attempts) {
+        if (attempt.delay) await sleep(attempt.delay);
+        try {
+          user = await requestOperator(attempt.path);
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (!user) throw lastError || new Error("Usuario Windows nao identificado.");
       const email = user?.email || user?.username || "Balança";
       const username = user?.username || String(email).split("@")[0] || "Balança";
       state.currentUser = {
@@ -557,11 +656,12 @@
         email,
       };
     } catch (error) {
-      state.currentUser = { username: "Balança", email: "Balança" };
+      state.currentUser = { username: "Usuario nao identificado", email: "Usuario nao identificado" };
     }
 
     els.currentUserEmail.textContent = state.currentUser.username;
     els.currentUserEmail.title = state.currentUser.username;
+    return state.currentUser;
   }
 
   function formatDate(value) {
@@ -697,6 +797,8 @@
       especificacao_quimico: normalizeText(field("especificacaoQuimico").value),
       destino_procedencia: normalizeText(field("destinoProcedencia").value),
       tara: normalizeOptionalInteger(field("tara").value),
+      num_agendamento: normalizeText(field("numAgendamento").value),
+      lacre: lacresFromForm(),
       observacao: normalizeText(field("observacao").value),
     };
   }
@@ -711,6 +813,8 @@
     field("especificacaoQuimico").value = normalizeText(ticket.especificacao_quimico);
     field("destinoProcedencia").value = normalizeText(ticket.destino_procedencia);
     field("tara").value = ticket.tara ?? "";
+    field("numAgendamento").value = normalizeText(ticket.num_agendamento);
+    renderLacres(ticket.lacre);
     field("observacao").value = normalizeText(ticket.observacao);
     els.quimicoField.classList.toggle("hidden", ticket.produto !== "QUIMICOS");
   }
@@ -719,7 +823,7 @@
     const protectedIds = ["placaCavalo", "placaTanque"];
     els.ticketForm.classList.toggle("locked", locked);
     els.ticketForm.classList.toggle("protected-locked", protectedLocked && !locked);
-    els.ticketForm.querySelectorAll("input, select").forEach((control) => {
+    els.ticketForm.querySelectorAll("input, select, [data-lacre-action]").forEach((control) => {
       control.disabled = locked || (protectedLocked && protectedIds.includes(control.id));
     });
   }
@@ -858,7 +962,7 @@
         <div class="sequence-dot">${record.sequencia}</div>
         <div>
           <h4>Pesagem ${record.sequencia} - ${record.tipo === "SAIDA" ? "Saída" : "Entrada"}</h4>
-          <p>${formatDate(record.data_hora)} • ${scaleLabel(record.balanca)} • ${record.operador || "Balança"}</p>
+          <p>${formatDate(record.data_hora)} • ${scaleLabel(record.balanca)} • ${operatorLabel(record.operador)}</p>
         </div>
         <div class="timeline-weight">${formatKg(record.peso)}</div>
       `;
@@ -993,6 +1097,8 @@
       data.especificacao_quimico,
       data.destino_procedencia,
       data.tara,
+      data.num_agendamento,
+      data.lacre,
       data.observacao,
     ].some(Boolean);
   }
@@ -1049,6 +1155,8 @@
       return;
     }
 
+    await loadCurrentOperator();
+
     els.addWeighing.disabled = true;
     let returnedToList = false;
     setMessage("Registrando leitura atual da balança...", false);
@@ -1061,7 +1169,7 @@
       const updated = await api(`/tickets/${ticket.id}/weighings`, {
         method: "POST",
         body: JSON.stringify({
-          operador: state.currentUser.username || "Balança",
+          operador: currentOperatorNameForPayload(),
         }),
       });
       state.activeTicket = updated;
@@ -1304,9 +1412,38 @@
       loadTickets();
     });
 
+    els.ticketForm.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-lacre-action]");
+      if (!button) return;
+
+      const action = button.dataset.lacreAction;
+      if (action === "add") {
+        const input = addLacreInput("");
+        input.focus();
+        return;
+      }
+
+      if (action === "remove") {
+        const rows = [...els.lacresList.querySelectorAll(".lacre-row")];
+        const row = button.closest(".lacre-row");
+        if (rows.length <= 1) {
+          const input = row?.querySelector("input");
+          if (input) input.value = "";
+        } else {
+          row?.remove();
+        }
+        updateLacreRemoveState();
+        updateActiveDraftFromForm();
+        persistAfterFieldExit({ name: "lacre" });
+      }
+    });
+
     els.ticketForm.addEventListener("input", (event) => {
       if (!event.target.name) return;
       uppercaseInput(event.target);
+      if (event.target.name === "lacre_item") {
+        updateLacreRemoveState();
+      }
       updateActiveDraftFromForm();
       if (event.target.name === "produto") {
         els.quimicoField.classList.toggle("hidden", event.target.value !== "QUIMICOS");
