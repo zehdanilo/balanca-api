@@ -65,6 +65,20 @@
     return ignored.has(normalized) ? "Balança" : normalized;
   }
 
+  function weighingCreatedTime(record) {
+    const date = new Date(record?.created_at || record?.data_hora || 0);
+    const time = date.getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+
+  function orderedWeighings(rows) {
+    return [...(rows || [])].sort((a, b) => {
+      const byCreatedAt = weighingCreatedTime(a) - weighingCreatedTime(b);
+      if (byCreatedAt !== 0) return byCreatedAt;
+      return Number(a?.id || 0) - Number(b?.id || 0);
+    });
+  }
+
   function productLabel(ticket) {
     const label = PRODUCT_LABELS[ticket.produto] || ticket.produto || "--";
     if (ticket.produto === "QUIMICOS" && ticket.especificacao_quimico) {
@@ -74,12 +88,37 @@
   }
 
   function shouldShowLiquidWeight(ticket) {
-    return (ticket.pesagens || []).length > 0 && ticket.pesagens.length % 2 === 0 && ticket.peso_liquido !== null;
+    const pesagens = orderedWeighings(ticket.pesagens);
+    const hasTara = Number(ticket?.tara || 0) > 0;
+    return pesagens.length > 0 && (pesagens.length % 2 === 0 || (pesagens.length === 1 && hasTara)) && liquidWeight(ticket) !== null;
+  }
+
+  function liquidWeight(ticket) {
+    if (ticket.peso_liquido !== null && ticket.peso_liquido !== undefined) {
+      return ticket.peso_liquido;
+    }
+
+    const pesagens = orderedWeighings(ticket.pesagens);
+    const tara = Number(ticket?.tara || 0);
+    if (pesagens.length === 1 && tara > 0) {
+      return Math.max(Number(pesagens[0].peso || 0) - tara, 0);
+    }
+
+    if (pesagens.length >= 2 && pesagens.length % 2 === 0) {
+      let total = 0;
+      for (let index = 0; index < pesagens.length; index += 2) {
+        total += Math.abs(Number(pesagens[index].peso || 0) - Number(pesagens[index + 1].peso || 0));
+      }
+      return Math.max(total - tara, 0);
+    }
+
+    return null;
   }
 
   function ticketTitle(ticket) {
-    const weighingCount = (ticket.pesagens || []).length;
-    const status = weighingCount % 2 === 1 ? "PESAGEM PARCIAL" : "PESAGEM COMPLETA";
+    const weighingCount = orderedWeighings(ticket.pesagens).length;
+    const hasTara = Number(ticket?.tara || 0) > 0;
+    const status = weighingCount % 2 === 1 && !(weighingCount === 1 && hasTara) ? "PESAGEM PARCIAL" : "PESAGEM COMPLETA";
     return `TICKET DE BALANÇA - ${status}`;
   }
 
@@ -109,12 +148,14 @@
     const container = document.getElementById("weighings");
     container.innerHTML = "";
 
-    if (!ticket.pesagens?.length) {
+    const pesagens = orderedWeighings(ticket.pesagens);
+
+    if (!pesagens.length) {
       container.innerHTML = '<article class="weighing-block"><h2>Pesagens</h2><div class="weighing-box">Nenhuma pesagem registrada.</div></article>';
       return;
     }
 
-    ticket.pesagens.forEach((record) => {
+    pesagens.forEach((record) => {
       const card = document.createElement("article");
       card.className = "weighing-block";
       card.innerHTML = `
@@ -149,8 +190,11 @@
       text("fornecedor", ticket.fornecedor_cliente);
       text("transportadora", ticket.transportadora);
       text("produto", productLabel(ticket));
-      document.getElementById("tara").textContent =
-        ticket.tara === null || ticket.tara === undefined ? "" : formatKg(ticket.tara);
+      const tara = Number(ticket.tara || 0);
+      const taraField = document.getElementById("tara").closest(".field");
+      document.querySelector(".field-grid").classList.toggle("has-tara", tara > 0);
+      taraField.classList.toggle("hidden", tara <= 0);
+      document.getElementById("tara").textContent = tara > 0 ? formatKg(tara) : "";
       text("destino", ticket.destino_procedencia);
       optionalText("num-agendamento", ticket.num_agendamento);
       optionalText("lacre", ticket.lacre);
@@ -159,7 +203,7 @@
       text("observacao", observacao);
       const netWeight = document.getElementById("net-weight");
       netWeight.style.display = shouldShowLiquidWeight(ticket) ? "grid" : "none";
-      text("peso-liquido", formatKg(ticket.peso_liquido));
+      text("peso-liquido", formatKg(liquidWeight(ticket)));
       renderWeighings(ticket);
       if (shouldAutoPrint) {
         setTimeout(() => window.print(), 350);

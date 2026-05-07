@@ -7,6 +7,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
 from ..database.base import Base
 
@@ -19,6 +20,10 @@ def _operator_label(value) -> str:
     normalized = " ".join(str(value or "").strip().split())
     ignored = {"", "BALANCA", "BALANÇA", "USUARIO NAO IDENTIFICADO", "USUÁRIO NÃO IDENTIFICADO"}
     return "Balança" if normalized.upper() in ignored else normalized
+
+
+def _weighing_creation_key(row):
+    return (row.created_at is None, row.created_at or datetime.max, row.id or 0)
 
 
 class ApiAccessLog(Base):
@@ -178,7 +183,7 @@ class WeighingTicket(Base):
         back_populates="ticket",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        order_by="WeighingRecord.sequencia",
+        order_by=lambda: (WeighingRecord.created_at, WeighingRecord.id),
     )
 
     def to_dict(self, include_weighings: bool = True):
@@ -207,7 +212,7 @@ class WeighingTicket(Base):
             "pesagens_count": len(self.weighings or []),
         }
         if include_weighings:
-            data["pesagens"] = [row.to_dict() for row in self.weighings]
+            data["pesagens"] = [row.to_dict() for row in sorted(self.weighings or [], key=_weighing_creation_key)]
         return data
 
 

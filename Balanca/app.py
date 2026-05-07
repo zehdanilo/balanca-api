@@ -461,6 +461,9 @@ def create_app() -> Flask:
             return default
         return max(number, 0)
 
+    def _weighing_creation_key(row):
+        return (row.created_at is None, row.created_at or datetime.max, row.id or 0)
+
     def _protected_in_progress_changes(ticket: WeighingTicket, data: dict) -> list[str]:
         protected_fields = [
             ("placa_cavalo", ("placa_cavalo", "placaCavalo"), 16, "Placa Cavalo"),
@@ -607,8 +610,8 @@ def create_app() -> Flask:
 
         return rows
 
-    def _refresh_ticket_weights(ticket: WeighingTicket) -> None:
-        rows = sorted(ticket.weighings or [], key=lambda row: row.sequencia)
+    def _refresh_ticket_weights_from_rows(ticket: WeighingTicket, rows) -> None:
+        rows = sorted(rows or [], key=_weighing_creation_key)
         if not rows:
             ticket.peso_inicial = None
             ticket.peso_final = None
@@ -617,20 +620,41 @@ def create_app() -> Flask:
 
         first = rows[0].peso
         last = rows[-1].peso
+        tara = int(ticket.tara or 0)
         ticket.peso_inicial = first
         ticket.peso_final = last if len(rows) >= 2 else None
-        if len(rows) >= 2 and len(rows) % 2 == 0:
+        if len(rows) == 1 and tara > 0:
+            ticket.peso_liquido = max(first - tara, 0)
+        elif len(rows) >= 2 and len(rows) % 2 == 0:
             total_liquido = 0
             for idx in range(0, len(rows), 2):
                 total_liquido += abs(rows[idx].peso - rows[idx + 1].peso)
-            ticket.peso_liquido = total_liquido
+            ticket.peso_liquido = max(total_liquido - tara, 0)
         else:
             ticket.peso_liquido = None
+
+    def _refresh_ticket_weights(ticket: WeighingTicket) -> None:
+        _refresh_ticket_weights_from_rows(ticket, ticket.weighings or [])
 
     def _next_weighing_type(sequence: int) -> str:
         if sequence % 2 == 0:
             return "SAIDA"
         return "ENTRADA"
+
+    def _can_close_ticket_with_rows(ticket: WeighingTicket, rows) -> bool:
+        count = len(rows or [])
+        if count == 0:
+            return False
+        if count % 2 == 0:
+            return True
+        return count == 1 and int(ticket.tara or 0) > 0
+
+    def _resequence_weighings(rows) -> list:
+        ordered = sorted(rows or [], key=_weighing_creation_key)
+        for index, row in enumerate(ordered, start=1):
+            row.sequencia = index
+            row.tipo = _next_weighing_type(index)
+        return ordered
 
     def _latest_scale_payload(db) -> dict | None:
         mem_payload = reader.get_latest_reading_dict()
@@ -921,6 +945,12 @@ def create_app() -> Flask:
             ticket = db.query(WeighingTicket).filter(WeighingTicket.id == ticket_id).first()
             if not ticket:
                 return fail("Ticket não encontrado.", 404)
+            previous_weights = (ticket.peso_inicial, ticket.peso_final, ticket.peso_liquido)
+            _refresh_ticket_weights(ticket)
+            if previous_weights != (ticket.peso_inicial, ticket.peso_final, ticket.peso_liquido):
+                ticket.updated_at = _now_local()
+                db.commit()
+                db.refresh(ticket)
             return ok(ticket.to_dict())
         finally:
             db.close()
@@ -945,6 +975,7 @@ def create_app() -> Flask:
 
             _apply_ticket_payload(ticket, data)
             _sync_ticket_catalogs(db, ticket)
+            _refresh_ticket_weights(ticket)
             db.commit()
             db.refresh(ticket)
             return ok(ticket.to_dict())
@@ -988,9 +1019,8 @@ def create_app() -> Flask:
             if _ticket_is_locked(ticket):
                 return ok(ticket.to_dict())
 
-            weighing_count = len(ticket.weighings or [])
-            if weighing_count == 0 or weighing_count % 2 != 0:
-                return fail("O ticket só pode ser encerrado após uma quantidade par de pesagens.", 400)
+            if not _can_close_ticket_with_rows(ticket, ticket.weighings or []):
+                return fail("O ticket so pode ser encerrado apos uma quantidade par de pesagens ou uma pesagem com tara informada.", 400)
 
             _refresh_ticket_weights(ticket)
             ticket.status = "COMPLETO"
@@ -1058,6 +1088,48 @@ def create_app() -> Flask:
             return ok(ticket.to_dict())
         finally:
             db.close()
+
+    def _delete_ticket_weighing_response(ticket_id: int, weighing_id: int):
+        data = request.get_json(silent=True) or {}
+        if not _is_admin_request(data):
+            return fail("Modo admin necessario para excluir uma pesagem.", 403)
+
+        db = SessionLocal()
+        try:
+            ticket = db.query(WeighingTicket).filter(WeighingTicket.id == ticket_id).first()
+            if not ticket:
+                return fail("Ticket nao encontrado.", 404)
+
+            record = (
+                db.query(WeighingRecord)
+                .filter(WeighingRecord.ticket_id == ticket_id, WeighingRecord.id == weighing_id)
+                .first()
+            )
+            if not record:
+                return fail("Pesagem nao encontrada.", 404)
+
+            remaining = [row for row in (ticket.weighings or []) if int(row.id) != int(weighing_id)]
+            db.delete(record)
+            remaining = _resequence_weighings(remaining)
+            _refresh_ticket_weights_from_rows(ticket, remaining)
+            ticket.status = "ABERTO" if not remaining else "EM_ANDAMENTO"
+            ticket.completed_at = None
+            ticket.updated_at = _now_local()
+
+            db.commit()
+            db.refresh(ticket)
+            db.expire(ticket, ["weighings"])
+            return ok(ticket.to_dict())
+        finally:
+            db.close()
+
+    @app.delete("/tickets/<int:ticket_id>/weighings/<int:weighing_id>")
+    def delete_ticket_weighing(ticket_id: int, weighing_id: int):
+        return _delete_ticket_weighing_response(ticket_id, weighing_id)
+
+    @app.post("/tickets/<int:ticket_id>/weighings/<int:weighing_id>/delete")
+    def delete_ticket_weighing_compat(ticket_id: int, weighing_id: int):
+        return _delete_ticket_weighing_response(ticket_id, weighing_id)
 
     @app.get("/health")
     def health():

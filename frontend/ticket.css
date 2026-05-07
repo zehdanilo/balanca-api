@@ -158,6 +158,18 @@ body {
   grid-column: span 12;
 }
 
+.field-product {
+  grid-column: span 5;
+}
+
+.field-tara {
+  grid-column: span 2;
+}
+
+.field-grid:not(.has-tara) .field-product {
+  grid-column: span 7;
+}
+
 .section-rule {
   height: 0;
   margin: 2.4mm 0;

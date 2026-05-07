@@ -38,9 +38,13 @@
     saveTimer: null,
     ticketCreatePromise: null,
     operationSeq: 0,
+    weighingInFlight: false,
+    deletingWeighingId: null,
     adminUnlocked: false,
     adminPassword: "",
-    currentUser: { username: "", email: "Balança" },
+    currentUser: { username: "Balança", email: "Balança" },
+    operatorLookupAttempted: false,
+    operatorLookupPromise: null,
     catalogs: {
       horsePlates: [],
       tankPlates: [],
@@ -319,6 +323,20 @@
     const normalized = normalizeText(value);
     const ignored = new Set(["", "BALANCA", "BALANÇA", "USUARIO NAO IDENTIFICADO", "USUÁRIO NÃO IDENTIFICADO"]);
     return ignored.has(normalized) ? "Balança" : normalized;
+  }
+
+  function weighingCreatedTime(record) {
+    const date = new Date(record?.created_at || record?.data_hora || 0);
+    const time = date.getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+
+  function orderedWeighings(rows) {
+    return [...(rows || [])].sort((a, b) => {
+      const byCreatedAt = weighingCreatedTime(a) - weighingCreatedTime(b);
+      if (byCreatedAt !== 0) return byCreatedAt;
+      return Number(a?.id || 0) - Number(b?.id || 0);
+    });
   }
 
   function normalizeOptionalInteger(value) {
@@ -602,13 +620,25 @@
     }
   }
 
-  async function loadCurrentOperator() {
+  async function loadCurrentOperator({ force = false } = {}) {
+    const authUnavailable = window.sessionStorage.getItem("balancaWindowsAuthUnavailable") === "1";
+    if (!force && (authUnavailable || state.operatorLookupAttempted)) {
+      els.currentUserEmail.textContent = state.currentUser.username;
+      els.currentUserEmail.title = state.currentUser.username;
+      return state.currentUser;
+    }
+
+    if (state.operatorLookupPromise) {
+      await state.operatorLookupPromise;
+      return state.currentUser;
+    }
+
+    state.operatorLookupAttempted = true;
     els.currentUserEmail.textContent = "Identificando...";
     els.currentUserEmail.title = "Identificando usuario do Windows";
 
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    const requestOperator = async (path) => {
-      const response = await fetch(`${path}${path.includes("?") ? "&" : "?"}t=${Date.now()}`, {
+    state.operatorLookupPromise = (async () => {
+      const response = await fetch(`/whoami?t=${Date.now()}`, {
         cache: "no-store",
         credentials: "include",
         headers: { Accept: "application/json" },
@@ -625,38 +655,22 @@
         throw error;
       }
       return payload.data;
-    };
+    })();
 
     try {
-      let user = null;
-      let lastError = null;
-      const attempts = [
-        { delay: 0, path: "/auth/whoami.aspx" },
-        { delay: 700, path: "/auth/whoami.aspx" },
-        { delay: 1500, path: "/auth/whoami.aspx" },
-        { delay: 2500, path: "/auth/whoami.aspx" },
-        { delay: 1000, path: "/whoami" },
-      ];
-
-      for (const attempt of attempts) {
-        if (attempt.delay) await sleep(attempt.delay);
-        try {
-          user = await requestOperator(attempt.path);
-          break;
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      if (!user) throw lastError || new Error("Usuario Windows nao identificado.");
+      const user = await state.operatorLookupPromise;
       const email = user?.email || user?.username || "Balança";
       const username = user?.username || String(email).split("@")[0] || "Balança";
       state.currentUser = {
         username,
         email,
       };
+      window.sessionStorage.removeItem("balancaWindowsAuthUnavailable");
     } catch (error) {
-      state.currentUser = { username: "Usuario nao identificado", email: "Usuario nao identificado" };
+      state.currentUser = { username: "Balança", email: "Balança" };
+      window.sessionStorage.setItem("balancaWindowsAuthUnavailable", "1");
+    } finally {
+      state.operatorLookupPromise = null;
     }
 
     els.currentUserEmail.textContent = state.currentUser.username;
@@ -694,7 +708,7 @@
   }
 
   function weighingBySequence(ticket, sequence) {
-    return (ticket.pesagens || []).find((record) => Number(record.sequencia) === sequence);
+    return orderedWeighings(ticket.pesagens).find((record) => Number(record.sequencia) === sequence);
   }
 
   function weighingTableCell(ticket, sequence) {
@@ -713,6 +727,8 @@
 
   function liquidWeight(ticket) {
     const count = Number(ticket.pesagens_count ?? ticket.pesagens?.length ?? 0);
+    const hasTara = Number(ticket?.tara || 0) > 0;
+    if (count === 1 && hasTara) return ticket.peso_liquido;
     if (count % 2 !== 0) return null;
     return ticket.peso_liquido;
   }
@@ -722,11 +738,13 @@
     return `${count} ${count <= 1 ? "pesagem" : "pesagens"}`;
   }
 
-  function pairLiquidWeight(pesagens, record) {
+  function pairLiquidWeight(pesagens, record, ticket) {
     if (record.sequencia % 2 !== 0) return "";
     const previous = pesagens[record.sequencia - 2];
     if (!previous) return "";
-    return formatKg(Math.abs(Number(previous.peso) - Number(record.peso)));
+    const pairLiquid = Math.abs(Number(previous.peso) - Number(record.peso));
+    const tara = record.sequencia === 2 ? Number(ticket?.tara || 0) : 0;
+    return formatKg(Math.max(pairLiquid - tara, 0));
   }
 
   function scaleLabel(value) {
@@ -766,7 +784,8 @@
 
   function canCloseTicket(ticket) {
     const count = ticket?.pesagens?.length || 0;
-    return Boolean(ticket?.id) && !isLocked(ticket) && count > 0 && count % 2 === 0;
+    const hasTara = Number(ticket?.tara || 0) > 0;
+    return Boolean(ticket?.id) && !isLocked(ticket) && count > 0 && (count % 2 === 0 || (count === 1 && hasTara));
   }
 
   function hasAdminConfirmation() {
@@ -930,7 +949,7 @@
 
   function renderOperation() {
     const ticket = state.activeTicket || emptyTicket;
-    const pesagens = ticket.pesagens || [];
+    const pesagens = orderedWeighings(ticket.pesagens);
 
     els.operationStatus.textContent = statusLabel(ticket.status).toUpperCase();
     els.operationTitle.textContent = ticket.id ? `Ticket ${shortTicketCode(ticket)}` : "Nova pesagem";
@@ -942,7 +961,8 @@
     const adminMissing = !hasAdminConfirmation();
     setFormLocked(isLocked(ticket) && adminMissing, isInProgress(ticket) && adminMissing);
     els.addWeighing.classList.toggle("hidden", isLocked(ticket));
-    els.addWeighing.disabled = isLocked(ticket);
+    els.addWeighing.disabled = isLocked(ticket) || state.weighingInFlight;
+    els.addWeighing.textContent = state.weighingInFlight ? "Registrando..." : "Nova leitura";
     els.closeTicket.classList.toggle("hidden", !showCloseAction);
     const canViewTicket = pesagens.length > 0;
     els.openPdf.classList.toggle("hidden", !canViewTicket);
@@ -956,19 +976,41 @@
     }
 
     pesagens.forEach((record) => {
+      const canDeleteWeighing = hasAdminConfirmation() && record.id;
+      const isDeleting = Number(state.deletingWeighingId) === Number(record.id);
       const item = document.createElement("article");
       item.className = "timeline-item";
       item.innerHTML = `
         <div class="sequence-dot">${record.sequencia}</div>
         <div>
-          <h4>Pesagem ${record.sequencia} - ${record.tipo === "SAIDA" ? "Saída" : "Entrada"}</h4>
+          <div class="timeline-title-row">
+            <h4>Pesagem ${record.sequencia} - ${record.tipo === "SAIDA" ? "Saída" : "Entrada"}</h4>
+            ${canDeleteWeighing ? `
+              <button
+                class="timeline-delete"
+                data-delete-weighing="${record.id}"
+                type="button"
+                title="Excluir pesagem"
+                aria-label="Excluir pesagem ${record.sequencia}"
+                ${isDeleting ? "disabled" : ""}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 6h18"/>
+                  <path d="M8 6V4h8v2"/>
+                  <path d="M19 6l-1 14H6L5 6"/>
+                  <path d="M10 11v5"/>
+                  <path d="M14 11v5"/>
+                </svg>
+              </button>
+            ` : ""}
+          </div>
           <p>${formatDate(record.data_hora)} • ${scaleLabel(record.balanca)} • ${operatorLabel(record.operador)}</p>
         </div>
         <div class="timeline-weight">${formatKg(record.peso)}</div>
       `;
       els.weighingTimeline.appendChild(item);
 
-      const pairLiquid = pairLiquidWeight(pesagens, record);
+      const pairLiquid = pairLiquidWeight(pesagens, record, ticket);
       if (pairLiquid) {
         const pairItem = document.createElement("article");
         pairItem.className = "pair-liquid-row";
@@ -1141,29 +1183,34 @@
   }
 
   async function handleAddWeighing() {
-    const draft = { ...(state.activeTicket || emptyTicket), ...ticketFromForm() };
-    const errors = validateHeader(draft);
-    if (errors.length) {
-      const message = `Preencha os campos obrigatórios: ${errors.join(", ")}.`;
-      setMessage(message, true);
-      await showNotice("Dados obrigatórios", message);
+    if (state.weighingInFlight) {
       return;
     }
 
-    if (isLocked(state.activeTicket) && !hasAdminConfirmation()) {
-      await showNotice("Modo admin necessário", "Libere o modo admin para realizar ações em tickets encerrados.");
-      return;
-    }
-
-    await loadCurrentOperator();
-
+    state.weighingInFlight = true;
     els.addWeighing.disabled = true;
+    els.addWeighing.textContent = "Registrando...";
     let returnedToList = false;
-    setMessage("Registrando leitura atual da balança...", false);
-    clearTimeout(state.saveTimer);
-    state.saveTimer = null;
 
     try {
+      const draft = { ...(state.activeTicket || emptyTicket), ...ticketFromForm() };
+      const errors = validateHeader(draft);
+      if (errors.length) {
+        const message = `Preencha os campos obrigatórios: ${errors.join(", ")}.`;
+        setMessage(message, true);
+        await showNotice("Dados obrigatórios", message);
+        return;
+      }
+
+      if (isLocked(state.activeTicket) && !hasAdminConfirmation()) {
+        await showNotice("Modo admin necessário", "Libere o modo admin para realizar ações em tickets encerrados.");
+        return;
+      }
+
+      setMessage("Registrando leitura atual da balança...", false);
+      clearTimeout(state.saveTimer);
+      state.saveTimer = null;
+
       const ticket = await persistActiveTicket();
       if (!ticket?.id) return;
       const updated = await api(`/tickets/${ticket.id}/weighings`, {
@@ -1196,7 +1243,9 @@
       setMessage(error.message, true);
       await showNotice("Falha ao registrar pesagem", error.message);
     } finally {
+      state.weighingInFlight = false;
       els.addWeighing.disabled = false;
+      els.addWeighing.textContent = "Nova leitura";
       if (!returnedToList) {
         renderOperation();
       }
@@ -1205,7 +1254,7 @@
 
   async function closeActiveTicket({ askConfirmation = false, printWindow = null } = {}) {
     if (!canCloseTicket(state.activeTicket)) {
-      await showNotice("Encerramento indisponivel", "O ticket so pode ser encerrado apos uma quantidade par de pesagens.");
+      await showNotice("Encerramento indisponivel", "O ticket so pode ser encerrado apos uma quantidade par de pesagens ou uma pesagem com tara informada.");
       return false;
     }
 
@@ -1252,6 +1301,48 @@
 
   async function handleCloseTicket() {
     await closeActiveTicket({ askConfirmation: true });
+  }
+
+  async function handleDeleteWeighing(recordId) {
+    if (!state.activeTicket?.id || !recordId) return;
+
+    if (!hasAdminConfirmation()) {
+      await showNotice("Modo admin necessario", "Libere o modo admin para excluir uma pesagem.");
+      return;
+    }
+
+    const record = (state.activeTicket.pesagens || []).find((item) => Number(item.id) === Number(recordId));
+    if (!record) return;
+
+    const confirmed = await confirmOperation(
+      "Excluir pesagem?",
+      `Deseja excluir a pesagem ${record.sequencia}? Os pesos e a sequencia do ticket serao recalculados.`,
+      {
+        confirmText: "Excluir",
+        danger: true,
+      }
+    );
+    if (!confirmed) return;
+
+    state.deletingWeighingId = Number(recordId);
+    renderOperation();
+
+    try {
+      const updated = await api(`/tickets/${state.activeTicket.id}/weighings/${recordId}/delete`, {
+        method: "POST",
+      });
+      state.activeTicket = updated;
+      fillForm(updated);
+      renderOperation();
+      await loadTickets();
+      showToast("Pesagem excluida com sucesso.", "success");
+    } catch (error) {
+      setMessage(error.message, true);
+      await showNotice("Falha ao excluir pesagem", error.message);
+    } finally {
+      state.deletingWeighingId = null;
+      renderOperation();
+    }
   }
 
   function ticketPrintUrl(id, autoPrint = false) {
@@ -1374,6 +1465,11 @@
     });
     els.addWeighing.addEventListener("click", handleAddWeighing);
     els.closeTicket.addEventListener("click", handleCloseTicket);
+    els.weighingTimeline.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-delete-weighing]");
+      if (!button) return;
+      handleDeleteWeighing(button.dataset.deleteWeighing);
+    });
 
     els.ticketSearch.addEventListener("keydown", () => {
       state.searchTouched = true;
