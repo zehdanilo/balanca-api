@@ -5,6 +5,7 @@
     GLP: "GLP",
     QUIMICOS: "QUÍMICOS",
     BORRA: "BORRA",
+    PETROLEO: "PETRÓLEO",
   };
 
   const emptyTicket = {

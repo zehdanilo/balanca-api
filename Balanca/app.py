@@ -916,7 +916,7 @@ def create_app() -> Flask:
                     )
                 )
 
-            rows = query.order_by(WeighingTicket.updated_at.desc(), WeighingTicket.id.desc()).limit(n).all()
+            rows = query.order_by(WeighingTicket.id.desc()).limit(n).all()
             return ok([row.to_dict(include_weighings=True) for row in rows], limit=n, date=selected_date, timezone="GMT-3")
         finally:
             db.close()
